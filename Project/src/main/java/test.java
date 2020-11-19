@@ -50,11 +50,11 @@ public class test {
 
         nodeAnalysis(graph,walaInfo);//对节点进行分析并把相应的信息记录到walainfo里
 
-        creatDot(walaInfo);//根据记录的信息生成.dot文件
+        //creatDot(walaInfo);//根据记录的信息生成.dot文件
 
         selection(walaInfo);//做变更选择
 
-        test();//测试选择结果
+        //test();//测试选择结果
     }
     public static CallGraph creatGraph(WalaInfo walaInfo) throws IOException, InvalidClassFileException, ClassHierarchyException, CancelException {
         CallGraph cg;
@@ -120,7 +120,6 @@ public class test {
                                 String preSignature = preMethod.getSignature();
                                 Collection<Annotation> annotations = preMethod.getAnnotations();
                                 walaInfo.methodMap.get(class_signature).add(preClass + " " + preSignature);
-
                                 System.out.println(preClass + " " + preSignature);
                                 for (Annotation a : annotations) {
                                     System.out.println(a.getType());
@@ -130,7 +129,6 @@ public class test {
                         }
                     }
                     System.out.println("前驱结束");
-
                 }
             } else {
                 System.out.println(String.format("'%s'不是一个ShrikeBTMethod：%s", node.getMethod(), node.getMethod().getClass()));
@@ -185,13 +183,12 @@ public class test {
                     classChange.add(strings[0]);
                     methodChange.add(str);
                 }
-                //System.out.println(str);
             } catch (IOException e) {
                 e.printStackTrace();
             }
             //类选择
             try {
-                BufferedWriter classSelectionOut = new BufferedWriter(new FileWriter("./Selection-C.txt"));
+                BufferedWriter classSelectionOut = new BufferedWriter(new FileWriter("./selection-class.txt"));
                 Set<String> methods = new HashSet<>();
                 walaInfo.temps=new HashSet<>();
                 for (String className : classChange) {
@@ -217,14 +214,13 @@ public class test {
 
                     methodChange.add(str);
                 }
-                //System.out.println(str);
             } catch (IOException e) {
                 e.printStackTrace();
             }
             //方法选择
             try {
 
-                BufferedWriter methodSelectionOut = new BufferedWriter(new FileWriter("./Selection-M.txt"));
+                BufferedWriter methodSelectionOut = new BufferedWriter(new FileWriter("./selection-method.txt"));
                 Set<String> methods = new HashSet<>();
                 walaInfo.temps=new HashSet<>();
                 for (String methodName : methodChange) {
