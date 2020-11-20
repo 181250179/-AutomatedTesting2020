@@ -25,7 +25,7 @@ class WalaInfo{
     public Map<String, Set<String>> methodMap = new HashMap<>();
     public Map<String, Set<String>> classMethodMap = new HashMap<>();
     public Map<String, ShrikeBTMethod> BTMethodMap = new HashMap<>();
-    public Set<String> temps = new HashSet<>();
+    public Set<String> temp = new HashSet<>();
     public WalaInfo(String[] str){
         this.command=str[0];
         this.project_target=str[1];
@@ -91,7 +91,6 @@ public class test {
                 // 使用Primordial类加载器加载的类都属于Java原生类，我们一般不关心。
                 if ("Application".equals(method.getDeclaringClass().getClassLoader().toString())) {
 
-
                     // 获取声明该方法的类的内部表示
                     String classInnerName = method.getDeclaringClass().getName().toString();
                     walaInfo.classMap.putIfAbsent(classInnerName, new HashSet<>());
@@ -99,15 +98,16 @@ public class test {
 
                     // 获取方法签名
                     String signature = method.getSignature();
-                    String class_signature = classInnerName + " " + signature;
-                    walaInfo.methodMap.putIfAbsent(class_signature, new HashSet<>());
-                    walaInfo.BTMethodMap.putIfAbsent(class_signature, method);
+                    String signature_class = classInnerName + " " + signature;
+                    //存储信息
+                    walaInfo.methodMap.putIfAbsent(signature_class, new HashSet<>());
+                    walaInfo.BTMethodMap.putIfAbsent(signature_class, method);
                     walaInfo.classMethodMap.get(classInnerName).add(classInnerName + " " + signature);
                     System.out.println(classInnerName + " " + signature);
-                    System.out.println("前驱");
-                    Iterator<CGNode> preIt = graph.getPredNodes(node);
-                    while (preIt.hasNext()) {
-                        CGNode preNode = preIt.next();
+
+                    Iterator<CGNode> preItems = graph.getPredNodes(node);
+                    while (preItems.hasNext()) {
+                        CGNode preNode = preItems.next();
                         if (preNode.getMethod() instanceof ShrikeBTMethod) {
                             ShrikeBTMethod preMethod = (ShrikeBTMethod) preNode.getMethod();
                             // 使用Primordial类加载器加载的类都属于Java原生类，我们一般不关心。
@@ -119,7 +119,7 @@ public class test {
                                 // 获取方法签名
                                 String preSignature = preMethod.getSignature();
                                 Collection<Annotation> annotations = preMethod.getAnnotations();
-                                walaInfo.methodMap.get(class_signature).add(preClass + " " + preSignature);
+                                walaInfo.methodMap.get(signature_class).add(preClass + " " + preSignature);
                                 System.out.println(preClass + " " + preSignature);
                                 for (Annotation a : annotations) {
                                     System.out.println(a.getType());
@@ -128,43 +128,42 @@ public class test {
                             }
                         }
                     }
-                    System.out.println("前驱结束");
                 }
             } else {
                 System.out.println(String.format("'%s'不是一个ShrikeBTMethod：%s", node.getMethod(), node.getMethod().getClass()));
             }
         }
+        //remove  Empty项
         walaInfo.classMap.entrySet().removeIf(item -> item.getValue().isEmpty());
         walaInfo.methodMap.entrySet().removeIf(item -> item.getValue().isEmpty());
     }
     public static void creatDot(WalaInfo walaInfo){
         try {
-            BufferedWriter classOut = new BufferedWriter(new FileWriter("class.dot"));
+            BufferedWriter Cwriter = new BufferedWriter(new FileWriter("class.dot"));
             String classTitle = "digraph cmd_class {\n";
-            classOut.write(classTitle);
+            Cwriter.write(classTitle);
             for (Map.Entry<String, Set<String>> entry : walaInfo.classMap.entrySet()) {
                 for (String str : entry.getValue()) {
                     String classLine = "   \"" + entry.getKey() + "\" -> \"" + str + "\";\n";
-                    classOut.write(classLine);
+                    Cwriter.write(classLine);
                 }
-
             }
-            classOut.write("}");
-            classOut.close();
-            BufferedWriter methodOut = new BufferedWriter(new FileWriter("method.dot"));
+            Cwriter.write("}");
+            Cwriter.close();
+            BufferedWriter Mwriter = new BufferedWriter(new FileWriter("method.dot"));
             String methodTitle = "digraph cmd_method {\n";
-            methodOut.write(methodTitle);
+            Mwriter.write(methodTitle);
             for (Map.Entry<String, Set<String>> entry : walaInfo.methodMap.entrySet()) {
                 String key = entry.getKey().split(" ")[1];
                 for (String str : entry.getValue()) {
 
                     String value = str.split(" ")[1];
                     String methodLine = "   \"" + key + "\" -> \"" + value + "\";\n";
-                    methodOut.write(methodLine);
+                    Mwriter.write(methodLine);
                 }
             }
-            methodOut.write("}");
-            methodOut.close();
+            Mwriter.write("}");
+            Mwriter.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -172,47 +171,47 @@ public class test {
     public static void selection(WalaInfo walaInfo){
         String command=walaInfo.getCommand();
         if(command.equals("-c")){
-            Set<String> classChange = new HashSet<>();
-            Set<String> methodChange = new HashSet<>();
+            Set<String> CChange = new HashSet<>();//存储class的change
+            Set<String> MChange = new HashSet<>();//存储method的change
 
-            try {
+            try {//读取变更信息
                 BufferedReader in = new BufferedReader(new FileReader(walaInfo.getChange_info()));
                 String str;
                 while ((str = in.readLine()) != null) {
                     String[] strings = str.split(" ");
-                    classChange.add(strings[0]);
-                    methodChange.add(str);
+                    CChange.add(strings[0]);
+                    MChange.add(str);
                 }
             } catch (IOException e) {
                 e.printStackTrace();
             }
             //类选择
             try {
-                BufferedWriter classSelectionOut = new BufferedWriter(new FileWriter("./selection-class.txt"));
+                BufferedWriter Cwriter = new BufferedWriter(new FileWriter("./selection-class.txt"));
                 Set<String> methods = new HashSet<>();
-                walaInfo.temps=new HashSet<>();
-                for (String className : classChange) {
+                walaInfo.temp =new HashSet<>();
+                for (String className : CChange) {
                     for (String classMethod : walaInfo.classMethodMap.get(className)) {
                         recurPre(classMethod, methods,walaInfo);
                     }
                 }
                 for (String method : methods) {
-                    classSelectionOut.write(method + "\n");
+                    Cwriter.write(method + "\n");
                 }
-                classSelectionOut.close();
+                Cwriter.close();
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
         else if(command.equals("-m")){
-            Set<String> methodChange = new HashSet<>();
+            Set<String> MChange = new HashSet<>();
 
             try {
                 BufferedReader in = new BufferedReader(new FileReader(walaInfo.getChange_info()));
                 String str;
                 while ((str = in.readLine()) != null) {
 
-                    methodChange.add(str);
+                    MChange.add(str);
                 }
             } catch (IOException e) {
                 e.printStackTrace();
@@ -220,17 +219,17 @@ public class test {
             //方法选择
             try {
 
-                BufferedWriter methodSelectionOut = new BufferedWriter(new FileWriter("./selection-method.txt"));
+                BufferedWriter Mwriter = new BufferedWriter(new FileWriter("./selection-method.txt"));
                 Set<String> methods = new HashSet<>();
-                walaInfo.temps=new HashSet<>();
-                for (String methodName : methodChange) {
+                walaInfo.temp =new HashSet<>();
+                for (String methodName : MChange) {
 
                     recurPre(methodName, methods,walaInfo);
                 }
                 for (String method : methods) {
-                    methodSelectionOut.write(method + "\n");
+                    Mwriter.write(method + "\n");
                 }
-                methodSelectionOut.close();
+                Mwriter.close();
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -252,8 +251,6 @@ public class test {
                 }
             }
         }
-        return;
-
     }
     public static void recurPre(String method, Set<String> methods, WalaInfo walaInfo) {
         if (!walaInfo.methodMap.containsKey(method)) {
@@ -264,8 +261,8 @@ public class test {
         for(String methodName:methodNames){
 
             if(walaInfo.methodMap.containsKey(methodName)){
-                if(!walaInfo.temps.contains(methodName)){
-                    walaInfo.temps.add(methodName);
+                if(!walaInfo.temp.contains(methodName)){
+                    walaInfo.temp.add(methodName);
                     recurPre(methodName,methods,walaInfo);
                 }
             }
@@ -296,25 +293,40 @@ public class test {
             ArrayList<String> s1=new ArrayList<>();
             while ((str = in1.readLine()) != null) {
                 //System.out.println(str);
+                if(str.length()<5)
+                    continue;
                 s1.add(str);
             }
             ArrayList<String> s2=new ArrayList<>();
             while ((str = in2.readLine()) != null) {
                 //System.out.println(str);
+                if(str.length()<5)
+                    continue;
                 s2.add(str);
             }
 
-            int cnt=0;
+            int cnt1=0;
             for(int i=0;i<s1.size();i++){
                 str=s1.get(i);
                 for(int j=0;j<s2.size();j++){
                     if(str.equals(s2.get(j)))
                         break;
                     if(j==s2.size() - 1)
-                        cnt++;
+                        cnt1++;
                 }
             }
-            System.out.println(cnt);
+            int cnt2=0;
+            for(int i=0;i<s2.size();i++){
+                str=s2.get(i);
+                for(int j=0;j<s1.size();j++){
+                    if(str.equals(s1.get(j)))
+                        break;
+                    if(j==s1.size() - 1)
+                        cnt2++;
+                }
+            }
+            System.out.println(cnt1);
+            System.out.println(cnt2);
         }catch (IOException e){
             System.out.println("erro");
        }
